@@ -1,0 +1,38 @@
+# ========== GENERAL ==========
+.DS_Store
+Thumbs.db
+*.log
+*.env
+*.env.*.local
+*.local
+*.swp
+*.swo
+
+# ========== NODE / NPM ==========
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ========== FRONTEND (React + Vite) ==========
+client/dist/
+client/.vite/
+client/.next/
+client/build/
+client/.cache/
+
+# ========== BACKEND (NestJS) ==========
+server/dist/
+server/.cache/
+server/coverage/
+server/.nestjs-cli.json
+
+# ========== OS / EDITOR ==========
+.vscode/
+.idea/
+*.iml
+
+# ========== GIT ==========
+*.orig
+*.patch
+*.rej
