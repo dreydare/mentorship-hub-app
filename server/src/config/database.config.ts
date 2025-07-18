@@ -4,28 +4,87 @@ import * as dotenv from 'dotenv';
 
 dotenv.config();
 
-export const databaseConfig: TypeOrmModuleOptions = {
-  type: 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  username: process.env.DB_USERNAME || 'postgres',
-  password: process.env.DB_PASSWORD || 'postgres',
-  database: process.env.DB_NAME || 'mentorship_platform',
+const isProduction = process.env.NODE_ENV === 'production';
+
+const commonConfig = {
   entities: [__dirname + '/../**/*.entity{.ts,.js}'],
   migrations: [__dirname + '/../database/migrations/*{.ts,.js}'],
-  synchronize: process.env.NODE_ENV === 'development',
-  logging: process.env.NODE_ENV === 'development',
 };
 
-export const dataSourceOptions: DataSourceOptions = {
-  type: 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  username: process.env.DB_USERNAME || 'postgres',
-  password: process.env.DB_PASSWORD || 'postgres',
-  database: process.env.DB_NAME || 'mentorship_platform',
-  entities: [__dirname + '/../**/*.entity{.ts,.js}'],
-  migrations: [__dirname + '/../database/migrations/*{.ts,.js}'],
-};
+export const databaseConfig: TypeOrmModuleOptions = isProduction
+  ? {
+      type: 'postgres',
+      url: process.env.DATABASE_URL,
+      ssl: {
+        rejectUnauthorized: false,
+      },
+      synchronize: false,
+      logging: false,
+      ...commonConfig,
+    }
+  : {
+      type: 'postgres',
+      host: process.env.DB_HOST || 'localhost',
+      port: parseInt(process.env.DB_PORT || '5432'),
+      username: process.env.DB_USERNAME || 'postgres',
+      password: process.env.DB_PASSWORD || 'postgres',
+      database: process.env.DB_NAME || 'mentorship_platform',
+      synchronize: true,
+      logging: true,
+      ...commonConfig,
+    };
+
+export const dataSourceOptions: DataSourceOptions = isProduction
+  ? {
+      type: 'postgres',
+      url: process.env.DATABASE_URL,
+      ssl: {
+        rejectUnauthorized: false,
+      },
+      ...commonConfig,
+    }
+  : {
+      type: 'postgres',
+      host: process.env.DB_HOST || 'localhost',
+      port: parseInt(process.env.DB_PORT || '5432'),
+      username: process.env.DB_USERNAME || 'postgres',
+      password: process.env.DB_PASSWORD || 'postgres',
+      database: process.env.DB_NAME || 'mentorship_platform',
+      ...commonConfig,
+    };
 
 export const dataSource = new DataSource(dataSourceOptions);
+
+
+
+// import { TypeOrmModuleOptions } from '@nestjs/typeorm';
+// import { DataSource, DataSourceOptions } from 'typeorm';
+// import * as dotenv from 'dotenv';
+
+// dotenv.config();
+
+// export const databaseConfig: TypeOrmModuleOptions = {
+//   type: 'postgres',
+//   host: process.env.DB_HOST || 'localhost',
+//   port: parseInt(process.env.DB_PORT || '5432'),
+//   username: process.env.DB_USERNAME || 'postgres',
+//   password: process.env.DB_PASSWORD || 'postgres',
+//   database: process.env.DB_NAME || 'mentorship_platform',
+//   entities: [__dirname + '/../**/*.entity{.ts,.js}'],
+//   migrations: [__dirname + '/../database/migrations/*{.ts,.js}'],
+//   synchronize: process.env.NODE_ENV === 'development',
+//   logging: process.env.NODE_ENV === 'development',
+// };
+
+// export const dataSourceOptions: DataSourceOptions = {
+//   type: 'postgres',
+//   host: process.env.DB_HOST || 'localhost',
+//   port: parseInt(process.env.DB_PORT || '5432'),
+//   username: process.env.DB_USERNAME || 'postgres',
+//   password: process.env.DB_PASSWORD || 'postgres',
+//   database: process.env.DB_NAME || 'mentorship_platform',
+//   entities: [__dirname + '/../**/*.entity{.ts,.js}'],
+//   migrations: [__dirname + '/../database/migrations/*{.ts,.js}'],
+// };
+
+// export const dataSource = new DataSource(dataSourceOptions);
