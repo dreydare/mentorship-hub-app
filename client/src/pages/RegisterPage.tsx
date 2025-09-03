@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
+import { useAuth } from '../contexts/AuthContext';
 
 export const RegisterPage: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -11,11 +12,18 @@ export const RegisterPage: React.FC = () => {
     email: '',
     password: '',
     confirmPassword: '',
-    role: 'MENTEE' as 'MENTOR' | 'MENTEE',
+    role: 'mentee' as 'mentor' | 'mentee',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { register, isAuthenticated } = useAuth();
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/dashboard');
+    }
+  }, [isAuthenticated, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,11 +37,14 @@ export const RegisterPage: React.FC = () => {
     }
     
     try {
-      // Temporary: simulate registration
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      navigate('/login');
-    } catch (err) {
-      setError('Registration failed. Please try again.');
+      await register({
+        email: formData.email,
+        password: formData.password,
+        role: formData.role,
+      });
+      navigate('/dashboard');
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -76,9 +87,9 @@ export const RegisterPage: React.FC = () => {
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
-                    onClick={() => setFormData({ ...formData, role: 'MENTEE' })}
+                    onClick={() => setFormData({ ...formData, role: 'mentee' })}
                     className={`p-3 rounded-lg border-2 transition-all ${
-                      formData.role === 'MENTEE'
+                      formData.role === 'mentee'
                         ? 'border-secondary-500 bg-secondary-50'
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
@@ -88,9 +99,9 @@ export const RegisterPage: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setFormData({ ...formData, role: 'MENTOR' })}
+                    onClick={() => setFormData({ ...formData, role: 'mentor' })}
                     className={`p-3 rounded-lg border-2 transition-all ${
-                      formData.role === 'MENTOR'
+                      formData.role === 'mentor'
                         ? 'border-primary-500 bg-primary-50'
                         : 'border-gray-200 hover:border-gray-300'
                     }`}

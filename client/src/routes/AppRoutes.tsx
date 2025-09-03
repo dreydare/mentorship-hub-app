@@ -1,7 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../store/auth.context';
 import { ProtectedRoute } from './ProtectedRoute';
-import { UserRole } from '../types/user.types';
+import { UserRole } from '../types/user';
 import { LoginPage } from '../pages/LoginPage';
 
 // Placeholder components - we'll create these next

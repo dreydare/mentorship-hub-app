@@ -1,103 +1,64 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Layout } from '../components/layout/Layout';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Avatar } from '../components/ui/Avatar';
-
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: 'admin' | 'mentor' | 'mentee';
-  status: 'active' | 'inactive' | 'suspended';
-  joinedDate: string;
-  avatar: string;
-}
-
-interface Analytics {
-  totalUsers: number;
-  totalMentors: number;
-  totalMentees: number;
-  totalSessions: number;
-  completedSessions: number;
-  revenue: number;
-  growthRate: number;
-}
-
-const mockUsers: User[] = [
-  {
-    id: '1',
-    name: 'Sarah Chen',
-    email: 'sarah.chen@example.com',
-    role: 'mentor',
-    status: 'active',
-    joinedDate: '2023-11-15',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400'
-  },
-  {
-    id: '2',
-    name: 'Michael Rodriguez',
-    email: 'michael.r@example.com',
-    role: 'mentor',
-    status: 'active',
-    joinedDate: '2023-12-01',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400'
-  },
-  {
-    id: '3',
-    name: 'Emily Johnson',
-    email: 'emily.j@example.com',
-    role: 'mentee',
-    status: 'active',
-    joinedDate: '2024-01-05',
-    avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400'
-  },
-  {
-    id: '4',
-    name: 'Alex Thompson',
-    email: 'alex.t@example.com',
-    role: 'mentee',
-    status: 'suspended',
-    joinedDate: '2023-10-20',
-    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400'
-  }
-];
-
-const mockAnalytics: Analytics = {
-  totalUsers: 1284,
-  totalMentors: 142,
-  totalMentees: 1140,
-  totalSessions: 3847,
-  completedSessions: 3215,
-  revenue: 287450,
-  growthRate: 23.5
-};
+import { adminService } from '../services/adminService';
+import type { AdminDashboardData } from '../services/adminService';
+import type { User } from '../types/user';
+import { useAuth } from '../contexts/AuthContext';
 
 export const AdminDashboard: React.FC = () => {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'sessions'>('overview');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showUserModal, setShowUserModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [dashboardData, setDashboardData] = useState<AdminDashboardData>({
+    stats: {
+      totalUsers: 0,
+      totalMentors: 0,
+      totalMentees: 0,
+      totalSessions: 0,
+      completedSessions: 0,
+      revenue: 0,
+      growthRate: 0
+    },
+    recentActivity: [],
+    users: [],
+    sessions: []
+  });
 
-  const getStatusBadge = (status: User['status']) => {
-    switch (status) {
-      case 'active':
-        return <Badge variant="primary">Active</Badge>;
-      case 'inactive':
-        return <Badge variant="secondary">Inactive</Badge>;
-      case 'suspended':
-        return <Badge variant="danger">Suspended</Badge>;
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      setIsLoading(true);
+      const data = await adminService.getDashboard();
+      setDashboardData(data);
+    } catch (error) {
+      console.error('Failed to fetch admin dashboard:', error);
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  const getStatusBadge = () => {
+    // Since User type doesn't have status, we'll use a simple active status
+    return <Badge variant="primary">Active</Badge>;
   };
 
   const getRoleBadge = (role: User['role']) => {
     switch (role) {
       case 'admin':
-        return <Badge variant="outline" className="border-purple-600 text-purple-600">Admin</Badge>;
+        return <Badge variant="default" className="border-purple-600 text-purple-600">Admin</Badge>;
       case 'mentor':
-        return <Badge variant="outline" className="border-primary-600 text-primary-600">Mentor</Badge>;
+        return <Badge variant="primary" className="border-primary-600 text-primary-600">Mentor</Badge>;
       case 'mentee':
-        return <Badge variant="outline" className="border-secondary-600 text-secondary-600">Mentee</Badge>;
+        return <Badge variant="secondary" className="border-secondary-600 text-secondary-600">Mentee</Badge>;
     }
   };
 
@@ -108,7 +69,12 @@ export const AdminDashboard: React.FC = () => {
   };
 
   return (
-    <Layout>
+    <Layout user={user ? {
+      name: user.name || user.email.split('@')[0],
+      email: user.email,
+      role: user.role.toUpperCase() as 'ADMIN' | 'MENTOR' | 'MENTEE',
+      avatar: user.profilePicture
+    } : undefined}>
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mb-8">
@@ -160,9 +126,9 @@ export const AdminDashboard: React.FC = () => {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm text-gray-600">Total Users</p>
-                        <p className="text-2xl font-bold text-gray-900">{mockAnalytics.totalUsers.toLocaleString()}</p>
+                        <p className="text-2xl font-bold text-gray-900">{dashboardData.stats.totalUsers.toLocaleString()}</p>
                         <p className="text-sm text-green-600 mt-1">
-                          +{mockAnalytics.growthRate}% from last month
+                          +{dashboardData.stats.growthRate}% from last month
                         </p>
                       </div>
                       <div className="h-12 w-12 bg-primary-100 rounded-lg flex items-center justify-center">
@@ -179,9 +145,9 @@ export const AdminDashboard: React.FC = () => {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm text-gray-600">Total Sessions</p>
-                        <p className="text-2xl font-bold text-gray-900">{mockAnalytics.totalSessions.toLocaleString()}</p>
+                        <p className="text-2xl font-bold text-gray-900">{dashboardData.stats.totalSessions.toLocaleString()}</p>
                         <p className="text-sm text-gray-600 mt-1">
-                          {mockAnalytics.completedSessions} completed
+                          {dashboardData.stats.completedSessions} completed
                         </p>
                       </div>
                       <div className="h-12 w-12 bg-secondary-100 rounded-lg flex items-center justify-center">
@@ -198,9 +164,9 @@ export const AdminDashboard: React.FC = () => {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm text-gray-600">Active Mentors</p>
-                        <p className="text-2xl font-bold text-gray-900">{mockAnalytics.totalMentors}</p>
+                        <p className="text-2xl font-bold text-gray-900">{dashboardData.stats.totalMentors}</p>
                         <p className="text-sm text-gray-600 mt-1">
-                          {Math.round((mockAnalytics.totalMentors / mockAnalytics.totalUsers) * 100)}% of users
+                          {dashboardData.stats.totalUsers > 0 ? Math.round((dashboardData.stats.totalMentors / dashboardData.stats.totalUsers) * 100) : 0}% of users
                         </p>
                       </div>
                       <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center">
@@ -217,7 +183,7 @@ export const AdminDashboard: React.FC = () => {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm text-gray-600">Revenue</p>
-                        <p className="text-2xl font-bold text-gray-900">${(mockAnalytics.revenue / 1000).toFixed(1)}k</p>
+                        <p className="text-2xl font-bold text-gray-900">${(dashboardData.stats.revenue / 1000).toFixed(1)}k</p>
                         <p className="text-sm text-green-600 mt-1">
                           +18.2% from last month
                         </p>
@@ -308,33 +274,54 @@ export const AdminDashboard: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {mockUsers.map((user) => (
-                        <tr key={user.id} className="border-b hover:bg-gray-50 transition-colors">
-                          <td className="py-3 px-4">
-                            <div className="flex items-center">
-                              <Avatar src={user.avatar} alt={user.name} size="sm" />
-                              <span className="ml-3 font-medium text-gray-900">{user.name}</span>
+                      {isLoading ? (
+                        <tr>
+                          <td colSpan={6} className="py-8 text-center">
+                            <div className="inline-flex items-center">
+                              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+                              <span className="ml-2">Loading users...</span>
                             </div>
                           </td>
-                          <td className="py-3 px-4 text-gray-600">{user.email}</td>
-                          <td className="py-3 px-4">{getRoleBadge(user.role)}</td>
-                          <td className="py-3 px-4">{getStatusBadge(user.status)}</td>
-                          <td className="py-3 px-4 text-gray-600">
-                            {new Date(user.joinedDate).toLocaleDateString()}
-                          </td>
-                          <td className="py-3 px-4">
-                            <button
-                              onClick={() => {
-                                setSelectedUser(user);
-                                setShowUserModal(true);
-                              }}
-                              className="text-primary-600 hover:text-primary-700 font-medium"
-                            >
-                              Manage
-                            </button>
+                        </tr>
+                      ) : dashboardData.users.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="py-8 text-center text-gray-500">
+                            No users found
                           </td>
                         </tr>
-                      ))}
+                      ) : (
+                        dashboardData.users.map((user) => (
+                          <tr key={user.id} className="border-b hover:bg-gray-50 transition-colors">
+                            <td className="py-3 px-4">
+                              <div className="flex items-center">
+                                <Avatar 
+                                  src={`https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=0ea5e9&color=fff`} 
+                                  alt={user.name || 'User'} 
+                                  size="sm" 
+                                />
+                                <span className="ml-3 font-medium text-gray-900">{user.name || 'Unknown User'}</span>
+                              </div>
+                            </td>
+                            <td className="py-3 px-4 text-gray-600">{user.email}</td>
+                            <td className="py-3 px-4">{getRoleBadge(user.role)}</td>
+                            <td className="py-3 px-4">{getStatusBadge()}</td>
+                            <td className="py-3 px-4 text-gray-600">
+                              {new Date(user.createdAt || Date.now()).toLocaleDateString()}
+                            </td>
+                            <td className="py-3 px-4">
+                              <button
+                                onClick={() => {
+                                  setSelectedUser(user);
+                                  setShowUserModal(true);
+                                }}
+                                className="text-primary-600 hover:text-primary-700 font-medium"
+                              >
+                                Manage
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -374,13 +361,17 @@ export const AdminDashboard: React.FC = () => {
               <CardContent>
                 <div className="space-y-4">
                   <div className="flex items-center">
-                    <Avatar src={selectedUser.avatar} alt={selectedUser.name} size="lg" />
+                    <Avatar 
+                      src={`https://ui-avatars.com/api/?name=${encodeURIComponent(selectedUser.name || 'User')}&background=0ea5e9&color=fff`} 
+                      alt={selectedUser.name || 'User'} 
+                      size="lg" 
+                    />
                     <div className="ml-4">
-                      <h3 className="font-semibold text-gray-900">{selectedUser.name}</h3>
+                      <h3 className="font-semibold text-gray-900">{selectedUser.name || 'Unknown User'}</h3>
                       <p className="text-sm text-gray-600">{selectedUser.email}</p>
                       <div className="flex gap-2 mt-1">
                         {getRoleBadge(selectedUser.role)}
-                        {getStatusBadge(selectedUser.status)}
+                        {getStatusBadge()}
                       </div>
                     </div>
                   </div>
@@ -388,23 +379,13 @@ export const AdminDashboard: React.FC = () => {
                   <div className="border-t pt-4">
                     <p className="text-sm text-gray-600 mb-2">User Actions</p>
                     <div className="space-y-2">
-                      {selectedUser.status === 'active' ? (
-                        <Button
-                          variant="outline"
-                          className="w-full text-orange-600 border-orange-600 hover:bg-orange-50"
-                          onClick={() => handleUserAction('suspend', selectedUser)}
-                        >
-                          Suspend User
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          className="w-full text-green-600 border-green-600 hover:bg-green-50"
-                          onClick={() => handleUserAction('activate', selectedUser)}
-                        >
-                          Activate User
-                        </Button>
-                      )}
+                      <Button
+                        variant="outline"
+                        className="w-full text-orange-600 border-orange-600 hover:bg-orange-50"
+                        onClick={() => handleUserAction('suspend', selectedUser)}
+                      >
+                        Suspend User
+                      </Button>
                       <Button
                         variant="outline"
                         className="w-full text-red-600 border-red-600 hover:bg-red-50"

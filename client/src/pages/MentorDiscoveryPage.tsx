@@ -1,82 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Layout } from '../components/layout/Layout';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
 import { Avatar } from '../components/ui/Avatar';
-
-const mockUser = {
-  name: 'John Doe',
-  email: 'john@example.com',
-  role: 'MENTEE' as const,
-  avatar: 'https://ui-avatars.com/api/?name=John+Doe&background=0ea5e9&color=fff',
-};
+import { useMentor } from '../contexts/MentorContext';
+import { useAuth } from '../contexts/AuthContext';
+import type { MentorFilter } from '../types/mentor';
 
 const skills = [
   'React', 'Node.js', 'Python', 'Machine Learning', 'Product Management',
   'UI/UX Design', 'Data Science', 'Marketing', 'Leadership', 'Business Strategy'
 ];
 
-const mentors = [
-  {
-    id: 1,
-    name: 'Sarah Johnson',
-    avatar: 'https://ui-avatars.com/api/?name=Sarah+Johnson&background=d946ef&color=fff',
-    title: 'Senior Product Manager',
-    company: 'Tech Corp',
-    bio: 'Passionate about helping others grow in product management. 10+ years experience in tech.',
-    skills: ['Product Management', 'Leadership', 'Strategy'],
-    rating: 4.9,
-    sessions: 156,
-    price: 80,
-    availability: 'Available this week',
-  },
-  {
-    id: 2,
-    name: 'Michael Chen',
-    avatar: 'https://ui-avatars.com/api/?name=Michael+Chen&background=d946ef&color=fff',
-    title: 'Staff Engineer',
-    company: 'StartupXYZ',
-    bio: 'Love teaching system design and helping engineers level up their careers.',
-    skills: ['React', 'Node.js', 'System Design'],
-    rating: 4.8,
-    sessions: 203,
-    price: 100,
-    availability: 'Available tomorrow',
-  },
-  {
-    id: 3,
-    name: 'Emily Rodriguez',
-    avatar: 'https://ui-avatars.com/api/?name=Emily+Rodriguez&background=d946ef&color=fff',
-    title: 'Data Science Lead',
-    company: 'AI Solutions',
-    bio: 'Bridging the gap between data science theory and real-world applications.',
-    skills: ['Python', 'Machine Learning', 'Data Science'],
-    rating: 5.0,
-    sessions: 89,
-    price: 120,
-    availability: 'Next availability: Monday',
-  },
-  {
-    id: 4,
-    name: 'David Kim',
-    avatar: 'https://ui-avatars.com/api/?name=David+Kim&background=d946ef&color=fff',
-    title: 'UX Director',
-    company: 'Design Studio',
-    bio: 'Helping designers create user-centered products that make a difference.',
-    skills: ['UI/UX Design', 'Product Design', 'Leadership'],
-    rating: 4.7,
-    sessions: 134,
-    price: 90,
-    availability: 'Available this week',
-  },
-];
-
 export const MentorDiscoveryPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [priceRange, setPriceRange] = useState<'all' | 'budget' | 'premium'>('all');
+  const { user } = useAuth();
+  const { mentors, isLoading, error, fetchMentors, currentPage, totalPages } = useMentor();
+
+  useEffect(() => {
+    const filters: MentorFilter = {
+      search: searchQuery,
+      skills: selectedSkills,
+      minRate: priceRange === 'budget' ? 0 : priceRange === 'premium' ? 80 : undefined,
+      maxRate: priceRange === 'budget' ? 80 : undefined,
+    };
+    fetchMentors(filters, currentPage);
+  }, [searchQuery, selectedSkills, priceRange, currentPage]);
 
   const toggleSkill = (skill: string) => {
     setSelectedSkills(prev =>
@@ -86,22 +39,23 @@ export const MentorDiscoveryPage: React.FC = () => {
     );
   };
 
-  const filteredMentors = mentors.filter(mentor => {
-    const matchesSearch = mentor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      mentor.bio.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesSkills = selectedSkills.length === 0 ||
-      selectedSkills.some(skill => mentor.skills.includes(skill));
-    
-    const matchesPrice = priceRange === 'all' ||
-      (priceRange === 'budget' && mentor.price <= 80) ||
-      (priceRange === 'premium' && mentor.price > 80);
-    
-    return matchesSearch && matchesSkills && matchesPrice;
-  });
+  const handlePageChange = (page: number) => {
+    const filters: MentorFilter = {
+      search: searchQuery,
+      skills: selectedSkills,
+      minRate: priceRange === 'budget' ? 0 : priceRange === 'premium' ? 80 : undefined,
+      maxRate: priceRange === 'budget' ? 80 : undefined,
+    };
+    fetchMentors(filters, page);
+  };
 
   return (
-    <Layout user={mockUser}>
+    <Layout user={user ? { 
+      name: user.name || user.email.split('@')[0], 
+      email: user.email, 
+      role: user.role.toUpperCase() as 'ADMIN' | 'MENTOR' | 'MENTEE',
+      avatar: user.profilePicture
+    } : undefined}>
       <div className="min-h-screen bg-gray-50">
         {/* Hero Section */}
         <div className="bg-gradient-to-r from-primary-600 to-primary-700 text-white">
@@ -215,7 +169,7 @@ export const MentorDiscoveryPage: React.FC = () => {
             <div className="lg:col-span-3">
               <div className="flex items-center justify-between mb-6">
                 <p className="text-sm text-gray-600">
-                  Showing {filteredMentors.length} mentors
+                  Showing {mentors.length} mentors
                 </p>
                 <select className="rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500">
                   <option>Sort by: Recommended</option>
@@ -225,8 +179,35 @@ export const MentorDiscoveryPage: React.FC = () => {
                 </select>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {filteredMentors.map((mentor, index) => (
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm mb-6">
+                  {error}
+                </div>
+              )}
+
+              {isLoading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {[1, 2, 3, 4].map((i) => (
+                    <Card key={i} className="animate-pulse">
+                      <CardContent className="p-6">
+                        <div className="flex items-start space-x-4">
+                          <div className="w-16 h-16 bg-gray-200 rounded-full"></div>
+                          <div className="flex-1">
+                            <div className="h-5 bg-gray-200 rounded w-3/4 mb-2"></div>
+                            <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                          </div>
+                        </div>
+                        <div className="mt-4 space-y-2">
+                          <div className="h-4 bg-gray-200 rounded"></div>
+                          <div className="h-4 bg-gray-200 rounded w-5/6"></div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {mentors.map((mentor, index) => (
                   <Card
                     key={mentor.id}
                     className="hover:shadow-lg transition-all animate-fadeIn overflow-hidden"
@@ -236,7 +217,7 @@ export const MentorDiscoveryPage: React.FC = () => {
                       <div className="p-6">
                         <div className="flex items-start space-x-4">
                           <Avatar
-                            src={mentor.avatar}
+                            src={mentor.profilePicture || `https://ui-avatars.com/api/?name=${encodeURIComponent(mentor.name)}&background=d946ef&color=fff`}
                             alt={mentor.name}
                             size="xl"
                           />
@@ -245,13 +226,13 @@ export const MentorDiscoveryPage: React.FC = () => {
                               {mentor.name}
                             </h3>
                             <p className="text-sm text-gray-600">
-                              {mentor.title} at {mentor.company}
+                              {mentor.experience} years of experience
                             </p>
                             <div className="flex items-center mt-2 text-sm">
                               <span className="text-yellow-500">★</span>
-                              <span className="ml-1 font-medium">{mentor.rating}</span>
+                              <span className="ml-1 font-medium">{mentor.rating || 0}</span>
                               <span className="mx-2 text-gray-400">•</span>
-                              <span className="text-gray-600">{mentor.sessions} sessions</span>
+                              <span className="text-gray-600">{mentor.totalSessions || 0} sessions</span>
                             </div>
                           </div>
                         </div>
@@ -261,18 +242,21 @@ export const MentorDiscoveryPage: React.FC = () => {
                         </p>
                         
                         <div className="flex flex-wrap gap-2 mt-4">
-                          {mentor.skills.map((skill, idx) => (
+                          {mentor.skills.slice(0, 3).map((skill, idx) => (
                             <Badge key={idx} variant="default">{skill}</Badge>
                           ))}
+                          {mentor.skills.length > 3 && (
+                            <Badge variant="default">+{mentor.skills.length - 3} more</Badge>
+                          )}
                         </div>
                         
                         <div className="flex items-center justify-between mt-6 pt-6 border-t border-gray-100">
                           <div>
                             <p className="text-2xl font-bold text-gray-900">
-                              ${mentor.price}<span className="text-sm font-normal text-gray-600">/hour</span>
+                              ${mentor.hourlyRate}<span className="text-sm font-normal text-gray-600">/hour</span>
                             </p>
                             <p className="text-xs text-green-600 font-medium">
-                              {mentor.availability}
+                              {mentor.availability?.length ? 'Available' : 'Check availability'}
                             </p>
                           </div>
                           <div className="flex gap-2">
@@ -290,7 +274,9 @@ export const MentorDiscoveryPage: React.FC = () => {
                 ))}
               </div>
 
-              {filteredMentors.length === 0 && (
+              )}
+
+              {!isLoading && mentors.length === 0 && (
                 <Card className="text-center py-12">
                   <CardContent>
                     <svg className="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -304,6 +290,40 @@ export const MentorDiscoveryPage: React.FC = () => {
                     </p>
                   </CardContent>
                 </Card>
+              )}
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex justify-center mt-8">
+                  <nav className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <Button
+                        key={page}
+                        variant={page === currentPage ? 'primary' : 'outline'}
+                        size="sm"
+                        onClick={() => handlePageChange(page)}
+                      >
+                        {page}
+                      </Button>
+                    ))}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                    </Button>
+                  </nav>
+                </div>
               )}
             </div>
           </div>

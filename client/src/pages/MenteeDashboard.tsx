@@ -1,77 +1,65 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Layout } from '../components/layout/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Avatar } from '../components/ui/Avatar';
-
-const mockUser = {
-  name: 'John Doe',
-  email: 'john@example.com',
-  role: 'MENTEE' as const,
-  avatar: 'https://ui-avatars.com/api/?name=John+Doe&background=0ea5e9&color=fff',
-};
-
-const stats = [
-  { label: 'Active Sessions', value: '3', icon: '📅', color: 'bg-primary-100 text-primary-800' },
-  { label: 'Total Sessions', value: '12', icon: '🎯', color: 'bg-green-100 text-green-800' },
-  { label: 'Mentors', value: '5', icon: '👥', color: 'bg-secondary-100 text-secondary-800' },
-  { label: 'Goals Achieved', value: '8', icon: '🏆', color: 'bg-yellow-100 text-yellow-800' },
-];
-
-const upcomingSessions = [
-  {
-    id: 1,
-    mentor: 'Sarah Johnson',
-    mentorAvatar: 'https://ui-avatars.com/api/?name=Sarah+Johnson&background=d946ef&color=fff',
-    topic: 'Career Development',
-    date: '2024-01-15',
-    time: '3:00 PM',
-    duration: '60 min',
-  },
-  {
-    id: 2,
-    mentor: 'Michael Chen',
-    mentorAvatar: 'https://ui-avatars.com/api/?name=Michael+Chen&background=d946ef&color=fff',
-    topic: 'Technical Interview Prep',
-    date: '2024-01-17',
-    time: '2:00 PM',
-    duration: '45 min',
-  },
-];
-
-const recommendedMentors = [
-  {
-    id: 1,
-    name: 'Emily Rodriguez',
-    avatar: 'https://ui-avatars.com/api/?name=Emily+Rodriguez&background=d946ef&color=fff',
-    title: 'Senior Product Manager',
-    skills: ['Product Strategy', 'Leadership', 'Agile'],
-    rating: 4.9,
-    sessions: 156,
-  },
-  {
-    id: 2,
-    name: 'David Kim',
-    avatar: 'https://ui-avatars.com/api/?name=David+Kim&background=d946ef&color=fff',
-    title: 'Tech Lead',
-    skills: ['React', 'Node.js', 'System Design'],
-    rating: 4.8,
-    sessions: 203,
-  },
-];
+import { useAuth } from '../contexts/AuthContext';
+import { dashboardService } from '../services/dashboardService';
+import type { DashboardData } from '../services/dashboardService';
 
 export const MenteeDashboard: React.FC = () => {
+  const { user } = useAuth();
+  const [isLoading, setIsLoading] = useState(true);
+  const [dashboardData, setDashboardData] = useState<DashboardData>({
+    stats: {
+      activeSessions: 0,
+      totalSessions: 0,
+      totalMentors: 0,
+      goalsAchieved: 0
+    },
+    upcomingSessions: [],
+    recommendedMentors: [],
+    recentActivity: []
+  });
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      setIsLoading(true);
+      const data = await dashboardService.getMenteeDashboard();
+      setDashboardData(data);
+    } catch (error) {
+      console.error('Failed to fetch dashboard data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const stats = [
+    { label: 'Active Sessions', value: dashboardData.stats.activeSessions.toString(), icon: '📅', color: 'bg-primary-100 text-primary-800' },
+    { label: 'Total Sessions', value: dashboardData.stats.totalSessions.toString(), icon: '🎯', color: 'bg-green-100 text-green-800' },
+    { label: 'Mentors', value: dashboardData.stats.totalMentors.toString(), icon: '👥', color: 'bg-secondary-100 text-secondary-800' },
+    { label: 'Goals Achieved', value: dashboardData.stats.goalsAchieved.toString(), icon: '🏆', color: 'bg-yellow-100 text-yellow-800' },
+  ];
   return (
-    <Layout user={mockUser}>
+    <Layout user={user ? {
+      name: user.name || user.email.split('@')[0],
+      email: user.email,
+      role: user.role.toUpperCase() as 'ADMIN' | 'MENTOR' | 'MENTEE',
+      avatar: user.profilePicture
+    } : undefined}>
       <div className="min-h-screen bg-gray-50">
         {/* Hero Section */}
         <div className="gradient-mesh">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
             <div className="text-center sm:text-left">
               <h1 className="text-4xl font-bold text-gray-900 animate-slideUp">
-                Welcome back, {mockUser.name.split(' ')[0]}! 👋
+                Welcome back{user?.name ? `, ${user.name.split(' ')[0]}` : ''}! 👋
               </h1>
               <p className="mt-2 text-xl text-gray-600">
                 Continue your learning journey with your mentors
@@ -115,26 +103,61 @@ export const MenteeDashboard: React.FC = () => {
                   <CardDescription>Your scheduled mentorship sessions</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    {upcomingSessions.map((session) => (
-                      <div
-                        key={session.id}
-                        className="flex items-center justify-between p-4 rounded-lg border border-gray-200 hover:border-primary-300 hover:shadow-sm transition-all"
-                      >
-                        <div className="flex items-center space-x-4">
-                          <Avatar src={session.mentorAvatar} alt={session.mentor} size="md" />
-                          <div>
-                            <p className="font-medium text-gray-900">{session.mentor}</p>
-                            <p className="text-sm text-gray-600">{session.topic}</p>
+                  {isLoading ? (
+                    <div className="space-y-4">
+                      {[1, 2].map((i) => (
+                        <div key={i} className="animate-pulse flex items-center justify-between p-4 rounded-lg border border-gray-200">
+                          <div className="flex items-center space-x-4">
+                            <div className="w-10 h-10 bg-gray-200 rounded-full"></div>
+                            <div>
+                              <div className="h-4 bg-gray-200 rounded w-32 mb-2"></div>
+                              <div className="h-3 bg-gray-200 rounded w-24"></div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="h-4 bg-gray-200 rounded w-20 mb-1"></div>
+                            <div className="h-3 bg-gray-200 rounded w-16"></div>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <p className="text-sm font-medium text-gray-900">{session.date}</p>
-                          <p className="text-xs text-gray-600">{session.time} • {session.duration}</p>
+                      ))}
+                    </div>
+                  ) : dashboardData.upcomingSessions.length > 0 ? (
+                    <div className="space-y-4">
+                      {dashboardData.upcomingSessions.map((session) => (
+                        <div
+                          key={session.id}
+                          className="flex items-center justify-between p-4 rounded-lg border border-gray-200 hover:border-primary-300 hover:shadow-sm transition-all"
+                        >
+                          <div className="flex items-center space-x-4">
+                            <Avatar 
+                              src={`https://ui-avatars.com/api/?name=${encodeURIComponent(session.mentor?.name || 'Mentor')}&background=d946ef&color=fff`} 
+                              alt={session.mentor?.name || 'Mentor'} 
+                              size="md" 
+                            />
+                            <div>
+                              <p className="font-medium text-gray-900">{session.mentor?.name || 'Mentor'}</p>
+                              <p className="text-sm text-gray-600">{session.title}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-medium text-gray-900">
+                              {new Date(session.scheduledAt).toLocaleDateString()}
+                            </p>
+                            <p className="text-xs text-gray-600">
+                              {new Date(session.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {session.duration} min
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <p>No upcoming sessions scheduled</p>
+                      <Link to="/mentors">
+                        <Button size="sm" className="mt-2">Find a Mentor</Button>
+                      </Link>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -208,36 +231,70 @@ export const MenteeDashboard: React.FC = () => {
               <CardDescription>Based on your interests and goals</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {recommendedMentors.map((mentor) => (
-                  <div
-                    key={mentor.id}
-                    className="p-6 rounded-lg border border-gray-200 hover:border-primary-300 hover:shadow-md transition-all"
-                  >
-                    <div className="flex items-start space-x-4">
-                      <Avatar src={mentor.avatar} alt={mentor.name} size="lg" />
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-gray-900">{mentor.name}</h3>
-                        <p className="text-sm text-gray-600">{mentor.title}</p>
-                        <div className="flex items-center mt-2 text-sm">
-                          <span className="text-yellow-500">★</span>
-                          <span className="ml-1 font-medium">{mentor.rating}</span>
-                          <span className="mx-2 text-gray-400">•</span>
-                          <span className="text-gray-600">{mentor.sessions} sessions</span>
+              {isLoading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {[1, 2].map((i) => (
+                    <div key={i} className="animate-pulse p-6 rounded-lg border border-gray-200">
+                      <div className="flex items-start space-x-4">
+                        <div className="w-12 h-12 bg-gray-200 rounded-full"></div>
+                        <div className="flex-1">
+                          <div className="h-5 bg-gray-200 rounded w-32 mb-2"></div>
+                          <div className="h-4 bg-gray-200 rounded w-24 mb-4"></div>
+                          <div className="flex gap-2 mb-3">
+                            <div className="h-6 bg-gray-200 rounded w-16"></div>
+                            <div className="h-6 bg-gray-200 rounded w-20"></div>
+                          </div>
+                          <div className="h-8 bg-gray-200 rounded w-full"></div>
                         </div>
-                        <div className="flex flex-wrap gap-2 mt-3">
-                          {mentor.skills.map((skill, index) => (
-                            <Badge key={index} variant="default">{skill}</Badge>
-                          ))}
-                        </div>
-                        <Button size="sm" className="mt-4 w-full">
-                          View Profile
-                        </Button>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : dashboardData.recommendedMentors.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {dashboardData.recommendedMentors.map((mentor) => (
+                    <div
+                      key={mentor.id}
+                      className="p-6 rounded-lg border border-gray-200 hover:border-primary-300 hover:shadow-md transition-all"
+                    >
+                      <div className="flex items-start space-x-4">
+                        <Avatar 
+                          src={mentor.profilePicture || `https://ui-avatars.com/api/?name=${encodeURIComponent(mentor.name || 'Mentor')}&background=d946ef&color=fff`} 
+                          alt={mentor.name} 
+                          size="lg" 
+                        />
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-gray-900">{mentor.name}</h3>
+                          <p className="text-sm text-gray-600">{mentor.title || mentor.industry}</p>
+                          <div className="flex items-center mt-2 text-sm">
+                            <span className="text-yellow-500">★</span>
+                            <span className="ml-1 font-medium">{mentor.rating || '4.5'}</span>
+                            <span className="mx-2 text-gray-400">•</span>
+                            <span className="text-gray-600">${mentor.hourlyRate}/hr</span>
+                          </div>
+                          <div className="flex flex-wrap gap-2 mt-3">
+                            {(mentor.skills || []).slice(0, 3).map((skill: string, index: number) => (
+                              <Badge key={index} variant="default">{skill}</Badge>
+                            ))}
+                          </div>
+                          <Link to={`/mentors/${mentor.id}`}>
+                            <Button size="sm" className="mt-4 w-full">
+                              View Profile
+                            </Button>
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <p>No recommended mentors available</p>
+                  <Link to="/mentors">
+                    <Button size="sm" className="mt-2">Browse All Mentors</Button>
+                  </Link>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

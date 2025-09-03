@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
 import { Layout } from '../components/layout/Layout';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
 import { Avatar } from '../components/ui/Avatar';
+import { useAuth } from '../contexts/AuthContext';
+import { api } from '../lib/axios';
+import type { Profile } from '../types/user';
 
 interface ProfileData {
   name: string;
@@ -19,25 +21,116 @@ interface ProfileData {
   website?: string;
 }
 
-export const ProfilePage: React.FC = () => {
-  const [isEditing, setIsEditing] = useState(false);
+interface ProfilePageProps {
+  editMode?: boolean;
+}
+
+export const ProfilePage: React.FC<ProfilePageProps> = ({ editMode = false }) => {
+  const { user } = useAuth();
+  const [isEditing, setIsEditing] = useState(editMode);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [profileData, setProfileData] = useState<ProfileData>({
-    name: 'John Doe',
-    email: 'john@example.com',
-    bio: 'Passionate software engineer with 10+ years of experience in building scalable web applications. I love mentoring junior developers and helping them grow in their careers.',
-    expertise: ['React', 'Node.js', 'System Design', 'Career Growth', 'Interview Prep'],
-    availability: 'Weekends & Evenings',
-    rate: '$80/hour',
-    linkedIn: 'https://linkedin.com/in/johndoe',
-    github: 'https://github.com/johndoe',
-    website: 'https://johndoe.dev'
+    name: '',
+    email: '',
+    bio: '',
+    expertise: [],
+    availability: '',
+    rate: '',
+    linkedIn: '',
+    github: '',
+    website: ''
   });
 
   const [editData, setEditData] = useState(profileData);
 
-  const handleSave = () => {
-    setProfileData(editData);
-    setIsEditing(false);
+  useEffect(() => {
+    fetchProfile();
+  }, [user]);
+
+  useEffect(() => {
+    setIsEditing(editMode);
+  }, [editMode]);
+
+  const fetchProfile = async () => {
+    if (!user) return;
+    
+    try {
+      setIsLoading(true);
+      setError(null);
+      const { data } = await api.get<Profile>('/profiles/me');
+      setProfile(data);
+      
+      const profileData: ProfileData = {
+        name: data.user?.name || user.name || '',
+        email: data.user?.email || user.email || '',
+        bio: data.bio || '',
+        expertise: data.skills || [],
+        availability: data.availability || '',
+        rate: data.hourlyRate ? `$${data.hourlyRate}/hour` : '',
+        linkedIn: data.linkedIn || '',
+        github: data.github || '',
+        website: data.website || ''
+      };
+      
+      setProfileData(profileData);
+      setEditData(profileData);
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        // Profile doesn't exist, create default data from user
+        const defaultData: ProfileData = {
+          name: user.name || '',
+          email: user.email || '',
+          bio: '',
+          expertise: [],
+          availability: '',
+          rate: '',
+          linkedIn: '',
+          github: '',
+          website: ''
+        };
+        setProfileData(defaultData);
+        setEditData(defaultData);
+      } else {
+        setError('Failed to load profile');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!user) return;
+    
+    try {
+      setError(null);
+      const updateData = {
+        bio: editData.bio,
+        skills: editData.expertise,
+        industry: editData.expertise?.[0] || '', // Use first skill as industry for now
+        experience: '5+ years', // Default value
+        availability: editData.availability,
+        hourlyRate: editData.rate ? parseInt(editData.rate.replace(/\D/g, '')) : undefined,
+        linkedIn: editData.linkedIn,
+        github: editData.github,
+        website: editData.website
+      };
+
+      if (profile) {
+        // Update existing profile
+        await api.put('/profiles/me', updateData);
+      } else {
+        // Create new profile
+        await api.post('/profiles', updateData);
+      }
+      
+      setProfileData(editData);
+      setIsEditing(false);
+      fetchProfile(); // Refresh profile data
+    } catch (error) {
+      setError('Failed to save profile');
+    }
   };
 
   const handleCancel = () => {
@@ -45,10 +138,49 @@ export const ProfilePage: React.FC = () => {
     setIsEditing(false);
   };
 
+  if (isLoading) {
+    return (
+      <Layout user={user ? {
+        name: user.name || user.email.split('@')[0],
+        email: user.email,
+        role: user.role.toUpperCase() as 'ADMIN' | 'MENTOR' | 'MENTEE',
+        avatar: user.profilePicture
+      } : undefined}>
+        <div className="min-h-screen bg-gray-50 py-8">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="animate-pulse">
+              <div className="h-32 bg-gray-200 rounded-lg mb-8"></div>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 space-y-6">
+                  <div className="h-48 bg-gray-200 rounded-lg"></div>
+                  <div className="h-32 bg-gray-200 rounded-lg"></div>
+                </div>
+                <div className="space-y-6">
+                  <div className="h-32 bg-gray-200 rounded-lg"></div>
+                  <div className="h-48 bg-gray-200 rounded-lg"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
   return (
-    <Layout>
+    <Layout user={user ? {
+      name: user.name || user.email.split('@')[0],
+      email: user.email,
+      role: user.role.toUpperCase() as 'ADMIN' | 'MENTOR' | 'MENTEE',
+      avatar: user.profilePicture
+    } : undefined}>
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          {error && (
+            <div className="mb-4 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg">
+              {error}
+            </div>
+          )}
           {/* Profile Header */}
           <Card className="mb-8 overflow-hidden">
             <div className="h-32 bg-gradient-to-r from-primary-500 to-primary-600"></div>
